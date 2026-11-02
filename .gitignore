@@ -12,3 +12,5 @@ dist/
 .DS_Store
 # Vite 配置加载时生成的临时文件
 *.timestamp-*.mjs
+# 本机专用的一键启动脚本（路径写死，不进仓库）
+start-backend.cmd
