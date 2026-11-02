@@ -1,0 +1,35 @@
+@host = http://localhost:3001
+
+### 1. 健康检查
+GET {{host}}/api/health
+
+### 2. 文章列表（可加 ?status=published 过滤）
+GET {{host}}/api/posts
+
+### 3. 新建文章
+POST {{host}}/api/posts
+Content-Type: application/json
+
+{
+  "title": "我的第一篇文章",
+  "slug": "first-post",
+  "summary": "这是摘要",
+  "content": "这里是正文内容……",
+  "tags": "随笔,前端",
+  "status": "published"
+}
+
+### 4. 查单篇（把 1 换成真实 id）
+GET {{host}}/api/posts/1
+
+### 5. 更新文章（把 1 换成真实 id）
+PUT {{host}}/api/posts/1
+Content-Type: application/json
+
+{
+  "title": "改过的标题",
+  "status": "draft"
+}
+
+### 6. 删除文章（把 1 换成真实 id）
+DELETE {{host}}/api/posts/1
