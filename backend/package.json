@@ -5,7 +5,8 @@
   "description": "作品集+博客 CMS 后端：Express + 内置 node:sqlite",
   "scripts": {
     "start": "node --experimental-sqlite src/index.js",
-    "dev": "node --watch --experimental-sqlite src/index.js"
+    "dev": "node --watch --experimental-sqlite src/index.js",
+    "test": "node --experimental-sqlite --test test/api.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

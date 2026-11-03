@@ -11,5 +11,29 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:3001'
     }
+  },
+  // 生产构建
+  build: {
+    rollupOptions: {
+      output: {
+        // 分包：把不常变的第三方库单独打包。
+        // 好处是改一行业务代码，浏览器不需要重新下载整个 Vue / Element Plus，
+        // 而且这几个包可以并行下载。
+        manualChunks: {
+          vue: ['vue', 'vue-router', 'pinia'],
+          'element-plus': ['element-plus'],
+          markdown: ['marked', 'dompurify']
+        }
+      }
+    },
+    // Element Plus 整包引入大概 900KB，这里放宽告警阈值。
+    // 想进一步压缩就改成按需引入（unplugin-vue-components），代价是多两个构建期依赖。
+    chunkSizeWarningLimit: 1100
+  },
+  // Vitest 会读取这里的 test 配置（同一份配置文件，不用维护两套）
+  test: {
+    environment: 'node',
+    include: ['test/**/*.test.js'],
+    reporters: 'default'
   }
 });

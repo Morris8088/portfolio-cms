@@ -1,35 +1,102 @@
-@host = http://localhost:3001
+### ============================================================
+### api.http —— 用 REST Client 插件在编辑器里直接发请求
+### 用法：装 humao.rest-client 插件后，点每行上方的 "Send Request"
+### ============================================================
 
-### 1. 健康检查
+@host = http://localhost:3001
+@token = 把登录返回的 token 粘到这里
+
+### 健康检查
 GET {{host}}/api/health
 
-### 2. 文章列表（可加 ?status=published 过滤）
-GET {{host}}/api/posts
-
-### 3. 新建文章
-POST {{host}}/api/posts
+### ------------------------------------------------------------
+### 登录（成功后把 token 复制到上面的 @token）
+### ------------------------------------------------------------
+POST {{host}}/api/auth/login
 Content-Type: application/json
 
 {
-  "title": "我的第一篇文章",
-  "slug": "first-post",
-  "summary": "这是摘要",
-  "content": "这里是正文内容……",
-  "tags": "随笔,前端",
-  "status": "published"
+  "username": "admin",
+  "password": "admin123"
 }
 
-### 4. 查单篇（把 1 换成真实 id）
+### 当前登录用户（校验令牌是否有效）
+GET {{host}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### ------------------------------------------------------------
+### 文章
+### ------------------------------------------------------------
+
+### 列表：默认只返回已发布
+GET {{host}}/api/posts
+
+### 列表：分页 + 排序
+GET {{host}}/api/posts?page=1&pageSize=3&sort=popular
+
+### 列表：关键词搜索
+GET {{host}}/api/posts?q=jwt
+
+### 列表：按标签筛选
+GET {{host}}/api/posts?tag=Vue3
+
+### 列表：后台视角（带令牌可看草稿）
+GET {{host}}/api/posts?status=draft
+Authorization: Bearer {{token}}
+
+### 详情（会累加阅读量，并返回上一篇/下一篇）
 GET {{host}}/api/posts/1
 
-### 5. 更新文章（把 1 换成真实 id）
-PUT {{host}}/api/posts/1
+### 新建（需登录）
+POST {{host}}/api/posts
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
-  "title": "改过的标题",
+  "title": "用 REST Client 建的第一篇文章",
+  "tags": "测试,REST Client",
+  "content": "## 小标题\n\n这里是正文，支持 Markdown。",
   "status": "draft"
 }
 
-### 6. 删除文章（把 1 换成真实 id）
-DELETE {{host}}/api/posts/1
+### 更新（需登录，只传要改的字段）
+PUT {{host}}/api/posts/7
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "status": "published"
+}
+
+### 删除（需登录）
+DELETE {{host}}/api/posts/7
+Authorization: Bearer {{token}}
+
+### ------------------------------------------------------------
+### 标签 / 作品 / 统计
+### ------------------------------------------------------------
+GET {{host}}/api/tags
+
+GET {{host}}/api/projects
+
+GET {{host}}/api/stats
+Authorization: Bearer {{token}}
+
+### ------------------------------------------------------------
+### 异常场景（用来对照状态码）
+### ------------------------------------------------------------
+### 401：没带令牌就写数据
+POST {{host}}/api/posts
+Content-Type: application/json
+
+{ "title": "x", "content": "y" }
+
+### 400：缺必填字段
+POST {{host}}/api/posts
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{ "title": "" }
+
+### 404：文章不存在
+GET {{host}}/api/posts/999999

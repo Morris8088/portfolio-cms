@@ -1,175 +1,519 @@
 <template>
-  <div class="page">
-    <!-- 顶部标题区 -->
-    <header class="hero">
-      <h1>我的作品集</h1>
-      <p class="sub">Vue 3 + Express + SQLite 亲手搭的全栈站点</p>
-    </header>
+  <div class="home">
+    <!-- ============ 一、头图区 ============ -->
+    <section class="hero container rise">
+      <div class="hero-text">
+        <p class="eyebrow">Portfolio &amp; Blog</p>
+        <h1>
+          把学到的东西，<br />
+          写成<span class="em">能跑起来</span>的作品。
+        </h1>
+        <p class="lede">
+          自学前端出身，正在补后端和测试。这里放着我的项目、
+          踩过的坑，以及一些还没想明白的问题。写下来，是为了下次不再踩。
+        </p>
 
-    <!-- 筛选栏：切换 全部 / 已发布 / 草稿 -->
-    <div class="toolbar">
-      <el-radio-group v-model="filter" @change="load">
-        <el-radio-button value="">全部</el-radio-button>
-        <el-radio-button value="published">已发布</el-radio-button>
-        <el-radio-button value="draft">草稿</el-radio-button>
-      </el-radio-group>
-      <span class="count" v-if="!loading && !error">共 {{ posts.length }} 篇</span>
-    </div>
-
-    <!-- 加载中：骨架屏占位，避免白屏 -->
-    <el-skeleton v-if="loading" :rows="4" animated />
-
-    <!-- 出错：把后端或网络的问题显示出来，而不是白屏 -->
-    <el-alert
-      v-else-if="error"
-      :title="error"
-      type="error"
-      show-icon
-      :closable="false"
-    />
-
-    <!-- 空数据 -->
-    <el-empty v-else-if="posts.length === 0" description="还没有文章，去后端造几条试试" />
-
-    <!-- 文章列表 -->
-    <div v-else class="list">
-      <el-card
-        v-for="p in posts"
-        :key="p.id"
-        class="card"
-        shadow="hover"
-        @click="goDetail(p.id)"
-      >
-        <h2 class="title">{{ p.title }}</h2>
-        <p class="summary">{{ p.summary || '（暂无摘要）' }}</p>
-        <div class="meta">
-          <el-tag size="small" :type="p.status === 'published' ? 'success' : 'info'">
-            {{ p.status === 'published' ? '已发布' : '草稿' }}
-          </el-tag>
-          <span class="time">{{ formatDate(p.created_at) }}</span>
+        <div class="hero-actions">
+          <router-link to="/projects" class="btn primary">看看作品</router-link>
+          <a href="#posts" class="btn">读读文章</a>
         </div>
-      </el-card>
-    </div>
+
+        <p class="stack">
+          Vue 3 · Vite · Pinia · Express · SQLite · Vitest · pytest
+        </p>
+      </div>
+
+      <!-- 侧边小卡：告诉访客"这个人在做什么"，比一堆图标有温度 -->
+      <aside class="now">
+        <span class="now-label">Now</span>
+        <ul>
+          <li>把 JS 和 Vue 的基础补齐</li>
+          <li>让这个站从「能跑」到「能讲」</li>
+          <li>给商城项目补 E2E 用例</li>
+        </ul>
+        <span class="now-foot">最近更新 {{ lastUpdated }}</span>
+      </aside>
+    </section>
+
+    <!-- ============ 二、作品 ============ -->
+    <section class="container block">
+      <div class="section-head">
+        <h2>作品</h2>
+        <router-link to="/projects" class="more">全部作品 →</router-link>
+      </div>
+
+      <div v-if="projectsLoading" class="grid">
+        <el-skeleton v-for="i in 3" :key="i" :rows="4" animated />
+      </div>
+      <div v-else class="grid">
+        <ProjectCard
+          v-for="(p, i) in projects.slice(0, 3)"
+          :key="p.id"
+          :project="p"
+          :index="i"
+        />
+      </div>
+    </section>
+
+    <!-- ============ 三、文章 ============ -->
+    <section id="posts" class="container block">
+      <div class="section-head">
+        <h2>文章</h2>
+        <span class="count">共 {{ total }} 篇</span>
+      </div>
+
+      <!-- 搜索 + 排序 -->
+      <div class="toolbar">
+        <el-input
+          v-model="keyword"
+          placeholder="搜索标题、正文或标签…"
+          clearable
+          class="search"
+        >
+          <template #prefix>
+            <span class="search-icon">⌕</span>
+          </template>
+        </el-input>
+
+        <el-select v-model="sort" class="sort">
+          <el-option label="最新发布" value="newest" />
+          <el-option label="阅读最多" value="popular" />
+          <el-option label="最早发布" value="oldest" />
+        </el-select>
+      </div>
+
+      <!-- 标签筛选：点一下筛选，再点一下取消 -->
+      <div v-if="tags.length" class="tags">
+        <button
+          class="tag-btn"
+          :class="{ active: !activeTag }"
+          type="button"
+          @click="selectTag('')"
+        >
+          全部
+        </button>
+        <button
+          v-for="t in tags"
+          :key="t.name"
+          class="tag-btn"
+          :class="{ active: activeTag === t.name }"
+          type="button"
+          @click="selectTag(t.name)"
+        >
+          {{ t.name }}<span class="tag-count">{{ t.count }}</span>
+        </button>
+      </div>
+
+      <!-- 列表三态：加载 / 出错 / 空 -->
+      <div v-if="loading" class="list">
+        <el-skeleton v-for="i in 3" :key="i" :rows="2" animated />
+      </div>
+
+      <el-alert
+        v-else-if="error"
+        :title="error"
+        type="error"
+        show-icon
+        :closable="false"
+        description="确认后端是否在 3001 端口运行：cd backend && npm run dev"
+      />
+
+      <div v-else-if="posts.length === 0" class="empty">
+        <p>没有找到匹配的文章</p>
+        <button v-if="keyword || activeTag" class="btn" type="button" @click="resetFilters">
+          清空筛选条件
+        </button>
+      </div>
+
+      <div v-else class="list">
+        <PostCard v-for="p in posts" :key="p.id" :post="p" />
+      </div>
+
+      <!-- 分页：只有一页时不显示 -->
+      <div v-if="totalPages > 1" class="pager">
+        <el-pagination
+          v-model:current-page="page"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          background
+          hide-on-single-page
+        />
+      </div>
+    </section>
   </div>
 </template>
 
 <script setup>
-// ============================================================
-// script setup：Vue 3 的写法，这里定义的东西模板里能直接用
-// ============================================================
-import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { getPosts } from '../api';
-import { formatDate } from '../utils/date';
+import { ref, computed, watch, onMounted } from 'vue';
+import PostCard from '../components/PostCard.vue';
+import ProjectCard from '../components/ProjectCard.vue';
+import { getPosts, getTags, getProjects } from '../api';
+import { formatDateShort } from '../utils/date';
 
-const router = useRouter();
+// ---------- 状态 ----------
+const posts = ref([]);
+const total = ref(0);
+const page = ref(1);
+const pageSize = 6;
+const totalPages = ref(1);
 
-// ref() 造"会变的数据"。值存在 .value 里；
-// 但模板里写 {{ posts }} 时不用 .value，Vue 会自动拆
-const posts = ref([]);      // 文章数组
-const loading = ref(true);  // 是否正在加载
-const error = ref('');      // 错误信息，空字符串表示没错误
-const filter = ref('');     // 当前筛选：'' 全部 / 'published' / 'draft'
+const keyword = ref('');
+const activeTag = ref('');
+const sort = ref('newest');
 
-// 加载数据：筛选切换、页面首次进入都调这个函数
-async function load() {
+const loading = ref(true);
+const error = ref('');
+
+const tags = ref([]);
+const projects = ref([]);
+const projectsLoading = ref(true);
+
+const lastUpdated = computed(() => {
+  if (!posts.value.length) return '—';
+  return formatDateShort(posts.value[0].created_at);
+});
+
+// ---------- 加载列表 ----------
+async function loadPosts() {
   loading.value = true;
   error.value = '';
   try {
-    // getPosts 是我们自己封装的函数，直接返回文章数组
-    posts.value = await getPosts(filter.value);
+    const data = await getPosts({
+      q: keyword.value.trim(),
+      tag: activeTag.value,
+      sort: sort.value,
+      page: page.value,
+      pageSize
+    });
+    posts.value = data.items;
+    total.value = data.total;
+    totalPages.value = data.totalPages;
+
+    // 边界保护：删到只剩 1 页、或搜索后页码超界时，回退到第一页
+    if (page.value > data.totalPages) {
+      page.value = 1;
+      await loadPosts();
+    }
   } catch (e) {
-    error.value = e.message; // 拦截器已经把错误翻译成人话了
+    error.value = e.message;
     posts.value = [];
+    total.value = 0;
   } finally {
-    // 不管成功失败都要关掉 loading，否则骨架屏一直转
     loading.value = false;
   }
 }
 
-// 点击卡片跳到详情页
-function goDetail(id) {
-  router.push(`/posts/${id}`);
+// 搜索防抖：用户每敲一个字都请求一次太浪费，
+// 停手 300ms 才真正发请求
+let timer = null;
+watch(keyword, () => {
+  clearTimeout(timer);
+  timer = setTimeout(() => {
+    page.value = 1;
+    loadPosts();
+  }, 300);
+});
+
+// 换排序、换页码立即重新加载
+watch([sort, page], () => loadPosts());
+
+function selectTag(name) {
+  activeTag.value = activeTag.value === name ? '' : name;
+  page.value = 1;
+  loadPosts();
 }
 
-// 组件挂载完成后自动执行一次
-onMounted(load);
+function resetFilters() {
+  keyword.value = '';
+  activeTag.value = '';
+  page.value = 1;
+  loadPosts();
+}
+
+// ---------- 初始化 ----------
+onMounted(async () => {
+  loadPosts();
+
+  // 标签和作品与列表互不影响，可以并行请求
+  try {
+    tags.value = await getTags();
+  } catch {
+    tags.value = []; // 标签加载失败不影响主流程，静默降级
+  }
+
+  try {
+    projects.value = await getProjects();
+  } catch {
+    projects.value = [];
+  } finally {
+    projectsLoading.value = false;
+  }
+});
 </script>
 
 <style scoped>
-.page {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 48px 24px 80px;
-}
-
+/* ---------- 头图 ---------- */
 .hero {
-  text-align: center;
-  margin-bottom: 32px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 48px;
+  align-items: center;
+  padding-top: 72px;
+  padding-bottom: 24px;
 }
 
 .hero h1 {
-  font-size: 30px;
-  font-weight: 500;
-  margin: 0 0 8px;
-  color: var(--el-text-color-primary);
+  font-family: var(--font-serif);
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+  margin: 16px 0 18px;
+  color: var(--ink);
 }
 
-.hero .sub {
-  margin: 0;
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
+.hero h1 .em {
+  position: relative;
+  color: var(--brand);
+  white-space: nowrap;
 }
 
-.toolbar {
+/* 手写感的下划线：一条低透明度的粗线压在文字下面 */
+.hero h1 .em::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 8px;
+  background: rgba(31, 111, 92, 0.14);
+  border-radius: 2px;
+  z-index: -1;
+}
+
+.lede {
+  max-width: 480px;
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--ink-soft);
+}
+
+.hero-actions {
   display: flex;
+  gap: 12px;
+  margin-bottom: 26px;
+}
+
+.btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
+  justify-content: center;
+  padding: 10px 22px;
+  border-radius: 9px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.btn.primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(31, 111, 92, 0.22);
+}
+
+.btn.primary:hover {
+  background: var(--brand-deep);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.stack {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
+/* ---------- Now 卡 ---------- */
+.now {
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.now-label {
+  display: inline-block;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.now ul {
+  margin: 0 0 16px;
+  padding-left: 16px;
+  font-size: 13.5px;
+  line-height: 1.9;
+  color: var(--ink-soft);
+}
+
+.now li::marker {
+  color: var(--brand);
+}
+
+.now-foot {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  display: block;
+}
+
+/* ---------- 区块 ---------- */
+.block {
+  padding-top: 56px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .count {
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: var(--ink-faint);
 }
 
+/* ---------- 工具栏 ---------- */
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.search {
+  flex: 1;
+  max-width: 420px;
+}
+
+.search-icon {
+  font-size: 16px;
+  color: var(--ink-faint);
+  line-height: 1;
+}
+
+.sort {
+  width: 132px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.tag-btn {
+  font: inherit;
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.tag-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.tag-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.tag-count {
+  margin-left: 5px;
+  opacity: 0.6;
+  font-size: 11px;
+}
+
+/* ---------- 列表 ---------- */
 .list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.card {
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.card:hover {
-  transform: translateY(-2px);
-}
-
-.card .title {
-  font-size: 18px;
-  font-weight: 500;
-  margin: 0 0 8px;
-  color: var(--el-text-color-primary);
-}
-
-.card .summary {
-  font-size: 14px;
-  line-height: 1.7;
-  color: var(--el-text-color-regular);
-  margin: 0 0 14px;
-}
-
-.card .meta {
-  display: flex;
-  align-items: center;
   gap: 12px;
+  min-height: 120px;
 }
 
-.card .time {
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
+.empty {
+  padding: 56px 0;
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+.empty p {
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+.pager {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding-top: 48px;
+  }
+  .hero h1 {
+    font-size: 34px;
+  }
+  .now {
+    display: none;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero h1 {
+    font-size: 27px;
+  }
+  .toolbar {
+    flex-direction: column;
+  }
+  .search {
+    max-width: none;
+  }
+  .sort {
+    width: 100%;
+  }
 }
 </style>
