@@ -4,7 +4,7 @@
     "role": "全栈 / 独立开发",
     "description": "你正在看的这个站。前台展示作品与文章，后台支持文章的增删改查、草稿态、标签、搜索与分页，登录使用自实现的 HMAC 令牌鉴权。",
     "tech": "Vue 3,Vite,Express,SQLite,Pinia",
-    "highlight": "10 个接口 · 手写 JWT · 前后端分离",
+    "highlight": "13 个接口 · 手写 JWT · 前后端分离",
     "link": "",
     "repo": "https://github.com/Morris8088",
     "sort_order": 1
