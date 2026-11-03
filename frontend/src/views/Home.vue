@@ -19,7 +19,7 @@
         </div>
 
         <p class="stack">
-          Vue 3 · Vite · Pinia · Express · SQLite · Vitest · pytest
+          Vue 3 · Vite · Pinia · Express · SQLite · Vitest
         </p>
       </div>
 
@@ -29,7 +29,7 @@
         <ul>
           <li>把 JS 和 Vue 的基础补齐</li>
           <li>让这个站从「能跑」到「能讲」</li>
-          <li>给商城项目补 E2E 用例</li>
+          <li>给这个站补更多接口用例</li>
         </ul>
         <span class="now-foot">最近更新 {{ lastUpdated }}</span>
       </aside>
@@ -45,7 +45,7 @@
       <div v-if="projectsLoading" class="grid">
         <el-skeleton v-for="i in 3" :key="i" :rows="4" animated />
       </div>
-      <div v-else class="grid">
+      <div v-else class="grid" :class="{ single: projects.length === 1 }">
         <ProjectCard
           v-for="(p, i) in projects.slice(0, 3)"
           :key="p.id"
@@ -394,6 +394,12 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
+}
+
+/* 只有一个作品时收窄，避免一张卡拉满 1040px */
+.grid.single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 680px;
 }
 
 .count {

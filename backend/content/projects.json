@@ -8,25 +8,5 @@
     "link": "",
     "repo": "https://github.com/Morris8088",
     "sort_order": 1
-  },
-  {
-    "title": "Vue 3 轻量商城",
-    "role": "前端开发",
-    "description": "从商品列表到下单的完整电商前端：搜索、分类、排序、购物车、结算。金额以「分」为单位运算规避浮点误差，支持满减与免运费规则。",
-    "tech": "Vue 3,Pinia,Vue Router,Element Plus,Vitest",
-    "highlight": "主包 1.13MB → 225KB（-80%）",
-    "link": "",
-    "repo": "https://github.com/Morris8088",
-    "sort_order": 2
-  },
-  {
-    "title": "商城自动化测试体系",
-    "role": "测试开发",
-    "description": "给自己写的商城配套三级测试：pytest 接口用例（含异常与边界）、Vitest 单元测试、Playwright E2E 主流程，并用 GitHub Actions 在每次提交时自动执行。",
-    "tech": "pytest,Playwright,Vitest,GitHub Actions,Allure",
-    "highlight": "68 条接口用例 · 覆盖率 98.77%",
-    "link": "",
-    "repo": "https://github.com/Morris8088",
-    "sort_order": 3
   }
 ]

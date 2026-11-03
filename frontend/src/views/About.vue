@@ -34,7 +34,7 @@
           <li>JavaScript 语言本身：作用域、闭包、原型链</li>
           <li>Vue 3 响应式原理：为什么改了数据视图就变了</li>
           <li>后端：错误处理、事务、索引与查询优化</li>
-          <li>测试：接口用例设计、E2E 稳定性</li>
+          <li>测试：接口用例设计、边界条件</li>
         </ul>
       </div>
 
@@ -53,7 +53,7 @@
             <li><span>前端</span>Vue 3 + Vite</li>
             <li><span>后端</span>Express + SQLite</li>
             <li><span>鉴权</span>手写 HMAC 令牌</li>
-            <li><span>测试</span>36 条接口 + 26 条单测</li>
+            <li><span>测试</span>36 条接口 + 44 条单测</li>
           </ul>
         </div>
       </aside>
@@ -65,7 +65,7 @@
 const skillGroups = [
   { name: '前端', items: ['Vue 3', 'Vite', 'Pinia', 'Vue Router', 'Element Plus', 'Axios', 'CSS'] },
   { name: '后端', items: ['Node.js', 'Express', 'SQLite', 'RESTful', '鉴权'] },
-  { name: '测试', items: ['Vitest', 'pytest', 'Playwright', 'GitHub Actions'] },
+  { name: '测试', items: ['Vitest', '接口测试', '边界用例'] },
   { name: '工具', items: ['Git', 'GitHub', 'VS Code', 'Postman / REST Client'] }
 ];
 </script>

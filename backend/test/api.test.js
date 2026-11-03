@@ -362,7 +362,7 @@ test('GET /api/tags 返回标签及文章数', async () => {
 test('GET /api/projects 公开可读', async () => {
   const { status, data } = await api('/api/projects');
   assert.equal(status, 200);
-  assert.ok(data.length >= 3);
+  assert.ok(data.length >= 1);
   assert.ok(data[0].title);
 });
 

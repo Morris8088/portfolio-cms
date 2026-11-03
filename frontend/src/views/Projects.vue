@@ -4,8 +4,8 @@
       <p class="eyebrow">Projects</p>
       <h1>做过的东西</h1>
       <p class="sub">
-        三个项目，一条线：先写前端，再补后端，最后给自己写测试。
-        每个项目都尽量做成「能点开、能看源码」的状态。
+        从零搭起来的一个完整项目：前端界面、后端接口、数据库、登录鉴权、
+        自动化测试都自己走了一遍。每条功能都是能点开、能看源码的状态。
       </p>
     </div>
 
@@ -21,7 +21,7 @@
       :closable="false"
     />
 
-    <div v-else class="grid">
+    <div v-else class="grid" :class="{ single: projects.length === 1 }">
       <ProjectCard v-for="(p, i) in projects" :key="p.id" :project="p" :index="i" />
     </div>
 
@@ -82,6 +82,13 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
+}
+
+/* 只有一个作品时不要拉满整行，收窄一点更像「一张卡」 */
+.grid.single {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 680px;
+  gap: 22px;
 }
 
 .cta {
