@@ -14,3 +14,7 @@ dist/
 *.timestamp-*.mjs
 # 本机专用的一键启动脚本（路径写死，不进仓库）
 start-backend.cmd
+# 本地备份（换库前留的旧数据）
+_backup/
+# 测试覆盖率报告
+coverage/
