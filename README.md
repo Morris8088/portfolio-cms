@@ -1,6 +1,7 @@
 # 作品集 + 博客 CMS
 
 [![CI](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml)
+[![Deploy Demo](https://github.com/Morris8088/portfolio-cms/actions/workflows/pages.yml/badge.svg)](https://github.com/Morris8088/portfolio-cms/actions/workflows/pages.yml)
 ![tests](https://img.shields.io/badge/tests-99%20passing-brightgreen)
 ![node](https://img.shields.io/badge/node-%E2%89%A522.5-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
