@@ -7,7 +7,11 @@
     <!-- Demo 部署在 GitHub Pages 上，用的是 hash 路由（地址里带 #）。
          如果访问的是 /portfolio-cms/projects 这种不带 # 的地址，
          静态服务器会直接 404，页面根本加载不出来。
-         这里把正确地址显示出来，省得自己拼。 -->
+         这里把正确地址显示出来，省得自己拼。
+         注意：只给文字提示，不在页面里做自动跳转。
+         真要做整页跳转必须写 window.location.replace，
+         这个站点使用 SPA 路由，任何整站跳转都该收在一个明确的地方，
+         免得以后调试时被"页面自己乱跑"搞晕。 -->
     <p v-if="isDemo" class="demo-hint">
       这个站点的正确地址长这样：<code>{{ homeUrl }}</code>
       <br />

@@ -55,6 +55,20 @@ jobs:
       - name: 构建 Demo
         run: npm --prefix frontend run build:demo
 
+      # 上线前先自己检查产物。
+      # GitHub Pages 拿到一个残缺的 dist 照样会报部署成功，
+      # 出了问题只能在浏览器里一个个猜，所以这里提前拦一道。
+      - name: 校验构建产物
+        run: |
+          set -e
+          cd frontend/dist
+          test -f index.html || { echo "缺少 index.html"; exit 1; }
+          test -f 404.html || { echo "缺少 404.html（SPA 兜底页）"; exit 1; }
+          ls assets/*.js > /dev/null || { echo "assets 下没有 js"; exit 1; }
+          ls assets/*.css > /dev/null || { echo "assets 下没有 css"; exit 1; }
+          grep -q 'demo' assets/*.js || { echo "产物里没有 demo 相关代码，可能打成了正式包"; exit 1; }
+          echo "产物校验通过：$(find . -type f | wc -l) 个文件"
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
