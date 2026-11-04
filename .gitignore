@@ -18,3 +18,7 @@ start-backend.cmd
 _backup/
 # 测试覆盖率报告
 coverage/
+# 用户上传的图片（运行时产物，不进仓库）。
+# 仓库留一个 .gitkeep 保住目录结构，部署时目录能被创建出来。
+backend/uploads/*
+!backend/uploads/.gitkeep

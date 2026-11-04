@@ -34,13 +34,24 @@ function slugify(input) {
   return base || `post-${Date.now()}`;
 }
 
-/** 没写摘要时，自动截取正文前 80 字 */
-function autoSummary(content, summary) {
+/** 没写摘要时，自动截取正文前 80 字（导出便于单测） */
+export function autoSummary(content, summary) {
   if (summary && String(summary).trim()) return String(summary).trim();
+
   const plain = String(content || '')
-    .replace(/[#>*`_\-[\]()]/g, '')
+    // 顺序很重要：先整块删掉图片/链接，否则下面去掉括号后
+    // "![图](/uploads/a.png)" 会碎成 "图/uploads/a.png" 这种垃圾
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    // 围栏代码块整段去掉，但行内代码保留内容（`npm test` 里的字是有信息量的）
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]*)`/g, '$1')
+    // 去掉标题井号、引用、强调符号、表格竖线
+    .replace(/^[ \t]*[#>\-*+]+[ \t]*/gm, '')
+    .replace(/[*_~|]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+
   return plain.length > 80 ? `${plain.slice(0, 80)}…` : plain;
 }
 

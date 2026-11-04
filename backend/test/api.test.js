@@ -9,12 +9,18 @@
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // 必须在 import app 之前设置环境变量（动态 import 保证顺序）
 process.env.DB_FILE = ':memory:';
 process.env.JWT_SECRET = 'unit-test-secret';
 process.env.ADMIN_USER = 'admin';
 process.env.ADMIN_PASS = 'admin123';
+// 上传测试写临时目录，别把真实 uploads 塞满测试垃圾
+const TMP_UPLOADS = mkdtempSync(join(tmpdir(), 'portfolio-uploads-'));
+process.env.UPLOAD_DIR = TMP_UPLOADS;
 
 const { default: app } = await import('../src/app.js');
 const { seed } = await import('../src/seed.js');
@@ -50,6 +56,7 @@ async function api(path, { method = 'GET', body, auth = false } = {}) {
 
 after(() => {
   server.close();
+  rmSync(TMP_UPLOADS, { recursive: true, force: true });
 });
 
 // ------------------------------------------------------------
@@ -411,4 +418,94 @@ test('请求体不是合法 JSON 时返回 400 而不是 500', async () => {
     body: '{ 这不是 JSON'
   });
   assert.equal(res.status, 400);
+});
+
+// ------------------------------------------------------------
+// 十、图片上传
+// ------------------------------------------------------------
+
+/** 造一个只用 1 像素的合法 PNG，避免往测试里塞大文件 */
+const PNG_1PX = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+/** 用 FormData 发一次上传请求 */
+async function upload(filename, buffer, { auth = true, field = 'file' } = {}) {
+  const form = new FormData();
+  form.append(field, new Blob([buffer]), filename);
+  const headers = auth && token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${BASE}/api/uploads`, { method: 'POST', headers, body: form });
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  return { status: res.status, data };
+}
+
+test('POST /api/uploads 未登录返回 401', async () => {
+  const { status } = await upload('a.png', PNG_1PX, { auth: false });
+  assert.equal(status, 401);
+});
+
+test('POST /api/uploads 上传 PNG 返回 201 和可访问的 URL', async () => {
+  const { status, data } = await upload('封面 图.png', PNG_1PX);
+  assert.equal(status, 201);
+  assert.match(data.url, /^\/uploads\/[0-9a-f-]{36}\.png$/);
+  assert.equal(data.name, '封面 图.png');
+  assert.equal(data.size, PNG_1PX.length);
+
+  // 返回的地址真的能取到文件，且是图片类型
+  const img = await fetch(`${BASE}${data.url}`);
+  assert.equal(img.status, 200);
+  assert.match(img.headers.get('content-type') || '', /^image\/png/);
+  // 文件名是 UUID 且内容不变，应该强缓存
+  assert.match(img.headers.get('cache-control') || '', /immutable/);
+});
+
+test('POST /api/uploads 拒绝不支持的扩展名', async () => {
+  const { status, data } = await upload('evil.exe', Buffer.from('MZ'));
+  assert.equal(status, 400);
+  assert.match(data.error, /不支持的图片格式/);
+});
+
+test('POST /api/uploads 拒绝伪装成图片的可执行文件', async () => {
+  // 浏览器同样会发 .sh，只看扩展名一样被拦
+  const { status } = await upload('payload.sh', Buffer.from('#!/bin/sh'));
+  assert.equal(status, 400);
+});
+
+test('POST /api/uploads 超过 5MB 返回 413', async () => {
+  const big = Buffer.concat([PNG_1PX, Buffer.alloc(6 * 1024 * 1024)]);
+  const { status, data } = await upload('big.png', big);
+  assert.equal(status, 413);
+  assert.match(data.error, /不能超过/);
+});
+
+test('POST /api/uploads 文件名被替换为随机 UUID，不会覆盖同名文件', async () => {
+  const a = await upload('same.png', PNG_1PX);
+  const b = await upload('same.png', PNG_1PX);
+  assert.equal(a.status, 201);
+  assert.equal(b.status, 201);
+  assert.notEqual(a.data.url, b.data.url);
+  assert.equal(readdirSync(TMP_UPLOADS).length >= 2, true);
+});
+
+test('POST /api/uploads 空请求返回 400', async () => {
+  const res = await fetch(`${BASE}/api/uploads`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: new FormData()
+  });
+  const data = await res.json();
+  assert.equal(res.status, 400);
+  assert.match(data.error, /没有收到文件/);
+});
+
+test('GET /uploads/不存在的文件返回 404，而不是 index.html', async () => {
+  const res = await fetch(`${BASE}/uploads/nope-1234.png`);
+  assert.equal(res.status, 404);
 });

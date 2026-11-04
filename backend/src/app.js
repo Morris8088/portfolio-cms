@@ -18,6 +18,7 @@ import projectsRouter from './routes/projects.js';
 import authRouter from './routes/auth.js';
 import statsRouter from './routes/stats.js';
 import tagsRouter from './routes/tags.js';
+import uploadsRouter, { UPLOAD_DIR } from './routes/uploads.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -36,12 +37,38 @@ app.use('/api/posts', postsRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/tags', tagsRouter);
+app.use('/api/uploads', uploadsRouter);
+
+// ---------- 上传的图片 ----------
+// 文件名是随机 UUID，内容一旦写入就不再变，所以可以放心强缓存一年。
+app.use(
+  '/uploads',
+  express.static(UPLOAD_DIR, {
+    maxAge: '1y',
+    immutable: true,
+    fallthrough: true, // 找不到就交给后面的 404 兜底，别把 SPA 回退搞坏
+    index: false
+  })
+);
 
 // ---------- 生产环境：顺手托管前端打包产物 ----------
 // 开发时前端跑在 5173，走后端用不到这段；
 // 部署时只需要跑一个 Node 服务，前端 dist 由它一起发出去，省一台服务器。
-const distDir = join(__dirname, '..', '..', 'frontend', 'dist');
-if (existsSync(distDir)) {
+//
+// 为什么不用写死的相对层级？
+//   本地结构是 backend/src/app.js  → dist 在 ../../frontend/dist
+//   容器结构是 /app/src/app.js     → dist 在 ../frontend/dist
+//   两处差一级，写死任何一个都会在另一个环境里 404。
+//   所以按优先级探测，谁存在用谁。
+const distCandidates = [
+  join(__dirname, '..', 'frontend', 'dist'), // 容器：/app/src → /app/frontend/dist
+  join(__dirname, '..', '..', 'frontend', 'dist'), // 本地：backend/src → frontend/dist
+  process.env.DIST_DIR || '' // 兜底：允许用环境变量直接指定
+].filter(Boolean);
+
+const distDir = distCandidates.find((dir) => existsSync(dir));
+
+if (distDir) {
   app.use(express.static(distDir));
   // SPA 回退：/posts/3 这种前端路由，服务器上并没有对应文件，
   // 一律返回 index.html 让前端路由自己解析

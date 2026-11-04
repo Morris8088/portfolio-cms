@@ -1,5 +1,8 @@
 # 作品集 + 博客 CMS
 
+[![CI](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 一个可以真正写完、部署上线、并且能对着代码讲清楚的全栈项目。
 
 前台是作品展示与技术博客，后台是带登录的文章管理。前端 Vue 3，后端 Express，
@@ -36,11 +39,13 @@
 - 仪表盘：文章总数 / 已发布 / 草稿 / 总阅读
 - 文章表格：按状态筛选、搜索、分页
 - 文章编辑器：标题 / slug / 标签 / 摘要 / 正文，Markdown 实时预览
+- 图片上传：点按钮选图或直接把图拖进编辑区，自动插入 Markdown 语法到光标处；
+  类型白名单（png/jpg/gif/webp/svg/avif）、单张 5MB 上限、UUID 随机命名防覆盖
 - 一键发布与转草稿、删除二次确认、未保存离开提醒
 
 **工程化**
 
-- 接口测试 36 条（Node 内置 test runner，零依赖）
+- 接口测试 44 条 + 纯函数单测 11 条（Node 内置 test runner，零依赖）
 - 前端单测 44 条（Vitest，覆盖纯函数与边界情况）
 - 生产构建分包：Vue / Element Plus / Markdown 各自独立 chunk
 - 内容与代码分离：文章是 `content/posts/*.md` 文件，seed 时读目录
@@ -104,11 +109,14 @@ portfolio-cms/
 │   │       ├── projects.js   作品集
 │   │       ├── auth.js       登录、当前用户
 │   │       ├── tags.js       标签聚合
-│   │       └── stats.js      后台统计
+│   │       ├── stats.js      后台统计
+│   │       └── uploads.js    图片上传（multer + 类型/大小白名单）
+│   ├── uploads/              上传的图片（运行时生成，不进仓库）
 │   ├── content/
 │   │   ├── posts/*.md        文章正文（front matter + Markdown）
 │   │   └── projects.json     作品集数据
-│   ├── test/api.test.js      36 条接口测试
+│   ├── test/api.test.js      44 条接口测试
+│   ├── test/pure.test.js     11 条纯函数单测
 │   └── api.http              REST Client 请求样例
 └── frontend/
     ├── src/
@@ -136,6 +144,7 @@ portfolio-cms/
 | PUT | `/api/posts/:id` | ✅ | 局部更新，只改传了的字段 |
 | DELETE | `/api/posts/:id` | ✅ | 删除 |
 | GET | `/api/tags` | — | 标签及文章数 |
+| POST | `/api/uploads` | ✅ | 上传图片（multipart，字段名 `file`），返回 `/uploads/xxx.png` |
 | GET | `/api/projects` | — | 作品列表 |
 | POST/PUT/DELETE | `/api/projects/…` | ✅ | 作品维护 |
 | GET | `/api/stats` | ✅ | 后台统计 |
@@ -149,11 +158,14 @@ portfolio-cms/
 ## 测试
 
 ```bash
-cd backend  && npm test    # 36 passed —— 接口：鉴权、CRUD、校验、分页、搜索、注入、错误处理
+cd backend  && npm test    # 55 passed —— 44 条接口（鉴权/CRUD/校验/分页/搜索/注入/上传）+ 11 条纯函数
 cd frontend && npm test    # 44 passed —— 纯函数：空值、边界、emoji、时区
 ```
 
 后端测试用 `:memory:` 内存库，跑完即弃，不污染 `data.db`。
+
+**CI**：每次推送和 PR 都会在 GitHub Actions 上并行跑「后端接口测试」和「前端单测 + 生产构建」
+（`.github/workflows/ci.yml`），Node 24 + `npm ci`，任何一步红了分支就不算绿的。
 
 ## 几个设计决策
 
@@ -190,13 +202,58 @@ cd ../backend && NODE_ENV=production npm start
 已处理的细节：SPA 深链接回退（`/posts/1` 直接刷新不会 404）、
 带扩展名的静态资源找不到时返回真 404 而不是 index.html。
 
-免费部署可选 Render / Railway（Node 服务），注意 SQLite 文件在部分平台是临时的，
-需要挂持久磁盘。
+### 用 Docker 部署
+
+```bash
+docker build -t portfolio-cms .
+docker run -p 3001:3001 -v $(pwd)/data:/app/data \
+  -e JWT_SECRET=换成一串随机字符 \
+  -e ADMIN_PASS=换成你自己的密码 \
+  portfolio-cms
+```
+
+镜像分两阶段：先用 Node 编译前端，再把产物塞进运行时镜像，最终只有一个 Node 进程。
+`-v ./data:/app/data` 把数据库和上传的图片挂到宿主机，容器重建也不丢。
+
+### 几个环境变量
+
+| 变量 | 默认值 | 作用 |
+|---|---|---|
+| `PORT` | `3001` | 监听端口，云平台一般会自动注入 |
+| `JWT_SECRET` | 内置开发值 | 令牌签名密钥，**生产必须改** |
+| `ADMIN_USER` / `ADMIN_PASS` | `admin` / `admin123` | 首次启动创建的管理员 |
+| `DATA_DIR` | `backend/` | 数据库和上传目录的父目录，挂持久卷时指过去 |
+| `DB_FILE` | `$DATA_DIR/data.db` | 直接指定数据库文件，测试用 `:memory:` |
+| `SEED` | 开 | 设 `0` 关闭自动灌演示数据 |
+
+### 关于免费托管（踩过的坑）
+
+我把主流方案试了一半，结论先说：**「免费 + 数据持久化」这个组合基本不存在。**
+
+| 平台 | 免费层能跑 Node？ | 数据持久化 | 真正的问题 |
+|---|---|---|---|
+| Render | 能 | 磁盘要付费（Starter 起） | 15 分钟无访问休眠，首次打开要等 30~60 秒 |
+| Railway | 只有一次性试用额度 | — | 试用完就转付费，不算永久免费 |
+| Fly.io | 新账号已无免费额度 | — | 要绑卡 |
+| Koyeb | 免费 nano 实例不休眠 | 卷还在测试阶段 | 存储不保证，适合无状态服务 |
+
+所以这里做了一个取舍：**按作品集的实际用途来配置**。
+
+访客只需要浏览，不需要写入。所以免费部署时让 SQLite 待在容器本地文件系统里：
+每次重启数据回到初始演示数据（6 篇文章 + 1 个作品），
+这反而是优点——面试官点开永远看到的是一个干净完整的演示，而不是被之前测试弄乱的库。
+
+真要写入持久化（比如你自己当博客用），两条路：
+- 平台付费档挂持久卷，把 `DATA_DIR` 指向卷（`render.yaml` 末尾有现成配置）
+- 或者换掉数据层，改接 Turso（边缘 SQLite）或 Neon（Serverless Postgres）
+
+仓库里已经放了 `Dockerfile`、`render.yaml`、`.dockerignore`，接平台时基本是填空。
 
 ## 已知限制 & 下一步
 
-- 图片上传还没做（现在文章封面用标题生成的渐变色块）
 - 评论、RSS、文章归档页未做
+- 单管理员，没有改密码 / 多用户
+- 数据库迁移是权宜实现（`ensureColumn`），正式项目该上 migration 工具
 - Element Plus 整包引入，体积 940KB（gzip 303KB）。下一步换按需引入可以压到 1/4
 - 没有刷新令牌，令牌过期就得重新登录
 - SQLite 单机够用，多实例部署要换 Postgres

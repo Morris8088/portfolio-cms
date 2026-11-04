@@ -56,15 +56,39 @@
             </div>
 
             <div class="field">
-              <label>正文 <em>*</em><span class="tip">支持 Markdown，右边「预览」可实时查看</span></label>
-              <el-input
-                v-model="form.content"
-                type="textarea"
-                :rows="22"
-                resize="vertical"
-                placeholder="## 小标题&#10;&#10;正文…"
-                class="content-input"
+              <label>
+                正文 <em>*</em>
+                <span class="tip">支持 Markdown，右边「预览」可实时查看</span>
+                <span class="spacer" />
+                <button type="button" class="upload-btn" :disabled="uploading" @click.prevent="pickImage">
+                  {{ uploading ? `上传中 ${progress}%` : '插入图片' }}
+                </button>
+              </label>
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,image/avif"
+                hidden
+                @change="onFileChange"
               />
+              <div
+                class="drop-zone"
+                :class="{ dragging }"
+                @dragover.prevent="dragging = true"
+                @dragleave.prevent="dragging = false"
+                @drop.prevent="onDrop"
+              >
+                <el-input
+                  ref="contentRef"
+                  v-model="form.content"
+                  type="textarea"
+                  :rows="22"
+                  resize="vertical"
+                  placeholder="## 小标题&#10;&#10;正文…&#10;&#10;（图片可以直接拖到这里上传）"
+                  class="content-input"
+                />
+                <div v-if="dragging" class="drop-mask">松手上传图片</div>
+              </div>
             </div>
           </el-tab-pane>
 
@@ -94,7 +118,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { getPost, createPost, updatePost } from '../../api';
+import { getPost, createPost, updatePost, uploadImage } from '../../api';
 import { formatDate, relativeTime } from '../../utils/date';
 import { renderMarkdown } from '../../utils/markdown';
 
@@ -120,6 +144,99 @@ const previewHtml = computed(() => renderMarkdown(form.content));
 
 // 有没有未保存的改动（离开页面前提醒用）
 const dirty = ref(false);
+
+// ---------- 图片上传 ----------
+const fileInput = ref(null);
+const contentRef = ref(null);
+const uploading = ref(false);
+const progress = ref(0);
+const dragging = ref(false);
+// 点「插入图片」那一刻的光标位置。文件选择框一弹出来，textarea 就失焦了，
+// 等上传完再去读 selectionStart 已经不准，所以必须提前记下来。
+const savedCursor = ref(null);
+
+function pickImage() {
+  if (uploading.value) return;
+  const el = textareaEl();
+  savedCursor.value = el ? el.selectionStart : form.content.length;
+  fileInput.value?.click();
+}
+
+function textareaEl() {
+  // el-input 组件实例上取真实 DOM 的方式：$el 是外层 div，里面才是 textarea。
+  // 用可选链兜底，避免组件还没挂载时抛错。
+  const root = contentRef.value?.$el;
+  if (root?.querySelector) return root.querySelector('textarea');
+  // ref 拿到 null 时退化为全局查找：本页只有一个正文 textarea
+  return document.querySelector('.content-input textarea');
+}
+
+function onFileChange(e) {
+  const file = e.target.files?.[0];
+  // 清空 value，否则连续选同一个文件不会再触发 change
+  e.target.value = '';
+  if (file) handleUpload(file);
+}
+
+function onDrop(e) {
+  dragging.value = false;
+  const file = e.dataTransfer?.files?.[0];
+  if (!file) return;
+  const el = textareaEl();
+  savedCursor.value = el ? el.selectionStart : form.content.length;
+  handleUpload(file);
+}
+
+async function handleUpload(file) {
+  if (uploading.value) return;
+
+  // 先在本地挡一层，省一次白跑的网络请求（后端还会再校验一次，不能只靠前端）
+  if (!file.type.startsWith('image/')) {
+    return ElMessage.warning('只能上传图片文件');
+  }
+  const MAX = 5 * 1024 * 1024;
+  if (file.size > MAX) {
+    return ElMessage.warning(`图片不能超过 ${MAX / 1024 / 1024}MB`);
+  }
+
+  uploading.value = true;
+  progress.value = 0;
+  try {
+    const { url } = await uploadImage(file, (p) => {
+      progress.value = p;
+    });
+    insertAt(savedCursor.value, `![](${url})`);
+    ElMessage.success('图片已插入');
+
+    // 切到预览让用户确认效果
+    tab.value = 'preview';
+  } catch (e) {
+    ElMessage.error(e.message);
+  } finally {
+    uploading.value = false;
+    progress.value = 0;
+    savedCursor.value = null;
+  }
+}
+
+/** 把一段文本插到指定位置，前后各留一个换行，保证 Markdown 图片独占一行 */
+function insertAt(pos, text) {
+  // 以 textarea 的真实内容为准：v-model 正常情况下是同步的，
+  // 但万一有输入法组词中 / 程序化赋值没触发 input 的情况，
+  // 用 DOM 里的值兜底，避免把用户已写的正文覆盖掉。
+  const dom = textareaEl();
+  const content = dom && dom.value !== form.content ? dom.value : form.content;
+
+  const at = typeof pos === 'number' ? Math.min(pos, content.length) : content.length;
+  const before = content.slice(0, at);
+  const after = content.slice(at);
+  const lead = before === '' || before.endsWith('\n') ? '' : '\n\n';
+  const tail = after === '' || after.startsWith('\n') ? '\n' : '\n\n';
+  form.content = `${before}${lead}${text}${tail}${after}`;
+  dirty.value = true;
+}
+
+// 有没有未保存的改动（离开页面前提醒用）
 watch(
   form,
   () => {
@@ -326,6 +443,56 @@ label em {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.75;
+}
+
+/* ---------- 图片上传 ---------- */
+.spacer {
+  flex: 1;
+}
+
+.upload-btn {
+  font-size: 12px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 3px 12px;
+  cursor: pointer;
+  transition: 0.15s;
+  font-family: inherit;
+}
+
+.upload-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+}
+
+.upload-btn:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.drop-zone {
+  position: relative;
+  border-radius: 8px;
+  transition: 0.15s;
+}
+
+.drop-zone.dragging {
+  outline: 2px dashed var(--brand);
+  outline-offset: 3px;
+}
+
+.drop-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(45, 106, 90, 0.08);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--brand);
+  pointer-events: none;
 }
 
 .preview {

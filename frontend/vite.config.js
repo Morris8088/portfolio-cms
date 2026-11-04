@@ -9,7 +9,9 @@ export default defineConfig({
     port: 5173,
     // 开发时代理：前端请求 /api/* 会被转发到后端 3001，避免跨域麻烦
     proxy: {
-      '/api': 'http://localhost:3001'
+      '/api': 'http://localhost:3001',
+      // 上传的图片也由后端发出来，开发模式同样要代理，否则 <img src="/uploads/..."> 会 404
+      '/uploads': 'http://localhost:3001'
     }
   },
   // 生产构建

@@ -1,0 +1,42 @@
+# ============================================================
+# render.yaml —— Render 一键部署配置
+# ------------------------------------------------------------
+# 用法：Render 控制台 → New → Blueprint → 选这个仓库，它会自动读这份文件。
+#
+# 免费层的两个已知限制，以及我为什么仍然选它：
+#   1. 15 分钟无访问会休眠，首次打开要等 30~60 秒
+#      → 解决办法：README 里放了直链，自己偶尔点一下保活；面试前先点开预热
+#   2. 免费层没有持久磁盘，容器重启后数据回到初始演示数据
+#      → 对作品集来说可以接受：永远是一个干净的、有 6 篇文章的演示现场
+#        真要用持久化，把 plan 改成 starter 并加 disk 段（见文件末尾注释）
+# ============================================================
+
+services:
+  - type: web
+    name: portfolio-cms
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore # 离国内最近
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # 令牌签名密钥。Render 会自动生成一个随机值，别用代码里的默认值
+      - key: JWT_SECRET
+        generateValue: true
+      # 生产环境的后台账号，自己改掉，别用 admin123
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASS
+        sync: false # 首次部署时在控制台手填，不写进仓库
+      - key: DATA_DIR
+        value: /app/data
+
+# ---------- 想升级成"数据不丢"，把上面 plan 改成 starter 并加这三行 ----------
+#    disk:
+#      name: data
+#      mountPath: /app/data
+#      sizeGB: 1

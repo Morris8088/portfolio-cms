@@ -11,12 +11,20 @@
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { mkdirSync } from 'node:fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // 数据库文件默认放在 backend/data.db。
 // 测试时用环境变量 DB_FILE=':memory:' 换成一个内存库，测完自动消失，不污染真实数据。
-const DB_FILE = process.env.DB_FILE || join(__dirname, '..', 'data.db');
+// 部署时有两种玩法：
+//   - 平台挂了持久卷 → 设 DATA_DIR 指向卷目录，库和图片一起持久化
+//   - 没挂卷（免费层常见） → 库跟着容器走，重启后数据回到初始演示数据，
+//     这对"给人点开看看"的作品集来说反而是好事：永远是一个干净的演示现场
+const DB_FILE = process.env.DB_FILE || join(process.env.DATA_DIR || join(__dirname, '..'), 'data.db');
+
+// 云平台通常把数据卷挂在 /data 之类的目录，第一次启动时目录可能不存在
+mkdirSync(dirname(DB_FILE), { recursive: true });
 
 const db = new DatabaseSync(DB_FILE);
 

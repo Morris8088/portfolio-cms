@@ -131,6 +131,30 @@ export function getStats() {
 }
 
 // ============================================================
+// 图片上传
+// ============================================================
+/**
+ * 上传一张图片，返回 { url, name, size, type }
+ * 注意两点：
+ *   1. 这里不能手动设 Content-Type，浏览器的 FormData 会自己带上 boundary
+ *   2. 图片有 5MB 上限，超时放宽到 30 秒
+ */
+export function uploadImage(file, onProgress) {
+  const form = new FormData();
+  form.append('file', file);
+  return request
+    .post('/uploads', form, {
+      timeout: 30000,
+      onUploadProgress: (e) => {
+        if (onProgress && e.total) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      }
+    })
+    .then((res) => res.data);
+}
+
+// ============================================================
 // 登录
 // ============================================================
 export function login(username, password) {
