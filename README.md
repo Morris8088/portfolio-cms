@@ -1,7 +1,6 @@
 # 作品集 + 博客 CMS
 
-<!-- CI 徽章：workflow 推上去之后把下面这行取消注释，同时删掉再下面的静态徽章 -->
-<!-- [![CI](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml) -->
+[![CI](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml)
 ![tests](https://img.shields.io/badge/tests-99%20passing-brightgreen)
 ![node](https://img.shields.io/badge/node-%E2%89%A522.5-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -168,7 +167,8 @@ cd frontend && npm test    # 44 passed —— 纯函数：空值、边界、emoj
 后端测试用 `:memory:` 内存库，跑完即弃，不污染 `data.db`。
 
 **CI**：每次推送和 PR 都会在 GitHub Actions 上并行跑「后端接口测试」和「前端单测 + 生产构建」
-（`.github/workflows/ci.yml`），Node 24 + `npm ci`，任何一步红了分支就不算绿的。
+（`.github/workflows/ci.yml`），Node 22 + `npm ci`，任何一步红了分支就不算绿的。
+一次完整跑大约 25 秒。
 
 ## 几个设计决策
 
