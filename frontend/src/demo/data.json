@@ -1,0 +1,95 @@
+{
+  "posts": [
+    {
+      "id": 1,
+      "title": "从零搭一个 Vue 3 + Express 全栈站点，我踩过的 7 个坑",
+      "slug": "build-fullstack-cms",
+      "summary": "这是我第一个从脚手架写到部署的完整项目。它只有 3 张表、13 个接口，却让我把前端路由、HTTP 状态码、跨域、数据迁移这些概念一次性串起来了。",
+      "content": "做作品集的时候我一直在想一个问题：**一个能拿去面试的项目，到底需要多复杂？**\r\n\r\n写完之后我的答案是：不需要复杂，需要**完整**。能跑通\"登录 → 写文章 → 前台看到 → 别人能访问\"这条链路，比堆十个花哨的组件有用得多。\r\n\r\n## 一、技术选型为什么这么选\r\n\r\n- **Vue 3 + Vite**：启动快，单文件组件结构清晰，`<script setup>` 写起来接近写普通 JS。\r\n- **Express**：最小可用，一个 `app.get()` 就是一个接口，理解成本低。\r\n- **SQLite**：单文件数据库，不需要装 MySQL，`git clone` 之后直接能跑。\r\n\r\n> 选型的第一原则不是\"哪个更先进\"，而是\"我能不能一个人把它跑起来\"。\r\n\r\n## 二、踩过的坑\r\n\r\n### 1. better-sqlite3 编译失败\r\n\r\n第一次装依赖就卡住了，报错大意是缺少 C++ 编译工具链。Windows 上要装 Visual Studio Build Tools，几个 G。\r\n\r\n后来发现 Node 22 以上内置了 `node:sqlite`，零依赖、零编译：\r\n\r\n```js\r\nimport { DatabaseSync } from 'node:sqlite';\r\nconst db = new DatabaseSync('./data.db');\r\n```\r\n\r\n**教训**：遇到原生模块编译问题，先查查标准库有没有替代品。\r\n\r\n### 2. Vite 只监听了 IPv6\r\n\r\n服务起来了，但浏览器打不开 `127.0.0.1:5173`。原因是 Vite 默认绑到 `::1`。\r\n\r\n```js\r\nserver: { host: true }\r\n```\r\n\r\n一行解决。\r\n\r\n### 3. 跨域与代理\r\n\r\n前端 5173、后端 3001，浏览器同源策略会拦。两种解法：后端开 CORS，或者用 Vite 代理把 `/api` 转发过去。\r\n\r\n我两个都做了：开发用代理（前端代码里只写 `/api/posts`，不写域名），部署时同一个服务出静态文件和接口，天然同源。\r\n\r\n## 三、数据表设计\r\n\r\n只用了三张表：\r\n\r\n| 表 | 作用 | 关键字段 |\r\n|---|---|---|\r\n| posts | 文章 | slug（唯一）、status、views |\r\n| projects | 作品集 | sort_order |\r\n| users | 管理员 | password（哈希） |\r\n\r\n这里有个细节：**slug 必须唯一**，因为将来做 SEO 友好链接要用它。数据库层面加 `UNIQUE` 约束，比在代码里查一遍再插入可靠得多——并发下代码检查是有空隙的。\r\n\r\n## 四、下一步\r\n\r\n- [x] 文章 CRUD\r\n- [x] 登录鉴权\r\n- [x] 搜索 / 标签 / 分页\r\n- [ ] 图片上传\r\n- [ ] 评论\r\n\r\n写项目最爽的时刻，不是功能跑通，而是三个月后回来看代码还能看懂。所以注释和目录结构，值得多花那半小时。",
+      "cover": null,
+      "tags": "Vue3,Node,全栈,复盘",
+      "status": "published",
+      "views": 168,
+      "created_at": "2026-10-28T10:20:00.000Z",
+      "updated_at": "2026-10-28T10:20:00.000Z"
+    },
+    {
+      "id": 2,
+      "title": "手写一个 JWT：鉴权其实没那么神秘",
+      "slug": "handwrite-jwt",
+      "summary": "不用 jsonwebtoken，不用 bcrypt，只用 Node 内置的 crypto 模块，30 行代码实现\"签发通行证 + 验证通行证\"。",
+      "content": "第一次看到 JWT 那一长串 `eyJhbGciOi...` 的时候，我以为是什么黑魔法。\r\n\r\n拆开看，它就是**三段 Base64 + 一次签名**。\r\n\r\n## 一、结构\r\n\r\n```\r\nheader.payload.signature\r\n```\r\n\r\n- **header**：说明用什么算法签名\r\n- **payload**：你想让服务器记住的信息（用户 id、过期时间）\r\n- **signature**：用密钥对前两段做 HMAC 计算\r\n\r\n关键在于：payload 是**明文可读**的（Base64 只是编码，不是加密）。所以千万别往里塞密码、手机号。\r\n\r\n## 二、签名怎么算\r\n\r\n```js\r\nconst signature = createHmac('sha256', SECRET)\r\n  .update(`${header}.${body}`)\r\n  .digest('base64url');\r\n```\r\n\r\n服务器验证时，用同样的密钥再算一遍，和用户带来的签名比对。**只要 payload 被改过一个字符，签名就对不上。**\r\n\r\n这就是\"防篡改\"的全部原理。\r\n\r\n## 三、密码为什么不能明文存\r\n\r\n数据库泄露的新闻年年有。如果存明文，等于把所有人的密码送出去——而且很多人多个平台用同一个密码。\r\n\r\n正确做法是存**哈希**：\r\n\r\n```js\r\nconst salt = randomBytes(16).toString('hex');\r\nconst hash = scryptSync(password, salt, 64).toString('hex');\r\n```\r\n\r\n- **salt（盐）**：每个用户随机不同。这样即使两个用户密码一样，哈希结果也不同，彩虹表直接失效。\r\n- **scrypt**：故意设计得很慢的算法。正常登录慢 50ms 无所谓，暴力破解要慢几万年。\r\n\r\n## 四、两个容易忽略的细节\r\n\r\n1. **比较要用 timingSafeEqual**\r\n   普通 `===` 会在第一个不同字符处返回，攻击者可以通过响应时间差猜出正确前缀。\r\n\r\n2. **登录失败提示要模糊**\r\n   \"账号不存在\"和\"密码错误\"要返回同一句话，否则等于告诉攻击者这个账号是有效的。\r\n\r\n## 五、前端怎么存令牌\r\n\r\n我用的是 `localStorage`，简单但要注意 XSS 风险。更安全的方案是 httpOnly Cookie，代价是跨域配置更麻烦。\r\n\r\n**没有绝对安全，只有权衡。** 能说清楚自己为什么这么选，比背结论重要。",
+      "cover": null,
+      "tags": "Node,鉴权,安全",
+      "status": "published",
+      "views": 143,
+      "created_at": "2026-10-24T09:05:00.000Z",
+      "updated_at": "2026-10-24T09:05:00.000Z"
+    },
+    {
+      "id": 3,
+      "title": "Vite 代理到底解决了什么问题",
+      "slug": "vite-proxy-cors",
+      "summary": "同源策略、CORS、代理转发，这三个词经常一起出现，但它们是三个不同层面的东西。用一个请求的完整旅程把它们串起来。",
+      "content": "## 先说结论\r\n\r\n浏览器里发起请求时，如果**协议、域名、端口**三者有一个不同，就是跨域。跨域请求默认拿不到响应。\r\n\r\n我的项目：前端 `localhost:5173`，后端 `localhost:3001` —— 端口不同，跨域。\r\n\r\n## 一个请求的旅程\r\n\r\n**不配代理时：**\r\n\r\n1. 页面在 5173，JS 里写 `fetch('http://localhost:3001/api/posts')`\r\n2. 浏览器发现跨域，先发一个 `OPTIONS` 预检请求\r\n3. 后端必须回 `Access-Control-Allow-Origin: http://localhost:5173`\r\n4. 少了这个头，浏览器直接把响应扔掉，控制台报 CORS error\r\n\r\n注意第 4 步：**请求其实到达了服务器**，是浏览器不让 JS 读结果。所以 CORS 是浏览器行为，不是服务器拒绝。\r\n\r\n**配了代理之后：**\r\n\r\n```js\r\n// vite.config.js\r\nserver: {\r\n  proxy: { '/api': 'http://localhost:3001' }\r\n}\r\n```\r\n\r\n1. 页面在 5173，JS 里写 `fetch('/api/posts')` —— 相对路径，同源\r\n2. Vite 开发服务器收到请求，**在服务端**转发给 3001\r\n3. 结果原样返回给浏览器\r\n\r\n浏览器全程只看到\"我请求了 5173\"，没有任何跨域。\r\n\r\n## 为什么要用相对路径\r\n\r\n```js\r\n// 好\r\naxios.create({ baseURL: '/api' })\r\n\r\n// 不好\r\naxios.create({ baseURL: 'http://localhost:3001/api' })\r\n```\r\n\r\n因为上线之后域名会变。写死地址的项目，每次部署都要改代码、重新构建。\r\n\r\n## 生产环境呢\r\n\r\nVite 代理只在 `npm run dev` 时生效，打包后的静态文件没有这个能力。\r\n\r\n我的做法是：**让 Express 同时托管前端 dist**。这样前后端同一个域名同一个端口，压根不存在跨域。部署也只需要启动一个 Node 进程。",
+      "cover": null,
+      "tags": "Vite,工程化,HTTP",
+      "status": "published",
+      "views": 116,
+      "created_at": "2026-10-20T14:40:00.000Z",
+      "updated_at": "2026-10-20T14:40:00.000Z"
+    },
+    {
+      "id": 4,
+      "title": "SQLite 分页查询怎么写才不慢",
+      "slug": "sqlite-pagination",
+      "summary": "LIMIT / OFFSET 看起来人畜无害，数据量一大就原形毕露。聊聊为什么深分页会慢，以及索引到底加在哪。",
+      "content": "## 最朴素的写法\r\n\r\n```sql\r\nSELECT * FROM posts ORDER BY created_at DESC LIMIT 6 OFFSET 6000;\r\n```\r\n\r\n这行 SQL 在 1000 条数据时飞快，在 100 万条时会让你怀疑人生。\r\n\r\n## 为什么慢\r\n\r\n`OFFSET 6000` 不是\"直接跳到第 6001 条\"。数据库必须**先取出前 6006 行，再把前 6000 行扔掉**。\r\n\r\n偏移量越大，扔掉的行越多，白干的活越多。\r\n\r\n## 两个改进方向\r\n\r\n### 1. 索引要建对\r\n\r\n```sql\r\nCREATE INDEX idx_posts_created ON posts(created_at DESC);\r\n```\r\n\r\n如果 `ORDER BY` 的列没索引，数据库还要额外做一次全表排序，那是真正的杀手。\r\n\r\n### 2. 游标分页（cursor）\r\n\r\n不用页码，改用\"上一页最后一条的时间\"：\r\n\r\n```sql\r\nSELECT * FROM posts\r\nWHERE created_at < '2026-10-16T08:30:00Z'\r\nORDER BY created_at DESC\r\nLIMIT 6;\r\n```\r\n\r\n不管翻到第几页，都只扫 6 行。缺点是不能跳页，适合信息流，不适合\"跳到第 37 页\"。\r\n\r\n## 我这个项目的选择\r\n\r\n后台管理用 `LIMIT/OFFSET`（文章总数有限，且需要页码跳转），前台信息流将来可以换游标。\r\n\r\n## 顺便说 COUNT\r\n\r\n列表接口通常要返回总数，那是一次额外的 `COUNT(*)`。它本身不便宜，所以：\r\n\r\n- 别在列表接口里做多表 JOIN + COUNT\r\n- 数据量大时用估算值，或者缓存 30 秒\r\n\r\n**先量再优化。** 没有 `EXPLAIN QUERY PLAN` 支撑的\"优化\"都是猜。",
+      "cover": null,
+      "tags": "SQLite,性能,后端",
+      "status": "published",
+      "views": 89,
+      "created_at": "2026-10-16T08:30:00.000Z",
+      "updated_at": "2026-10-16T08:30:00.000Z"
+    },
+    {
+      "id": 5,
+      "title": "我如何用纯函数把测试覆盖率做到 90%",
+      "slug": "pure-function-testing",
+      "summary": "组件难测，是因为它同时干了太多事：取数据、算状态、渲染 DOM。把\"算\"的部分抽成纯函数，测试立刻变简单。",
+      "content": "## 什么是纯函数\r\n\r\n给定相同输入，永远返回相同输出，且不产生副作用。\r\n\r\n```js\r\n// 纯函数：只依赖参数\r\nexport function parseTags(tags) {\r\n  return String(tags || '')\r\n    .split(',')\r\n    .map((t) => t.trim())\r\n    .filter(Boolean);\r\n}\r\n\r\n// 不纯：依赖了外部变量，还改了它\r\nlet cache = [];\r\nexport function addTag(tag) {\r\n  cache.push(tag);\r\n  return cache;\r\n}\r\n```\r\n\r\n## 为什么纯函数好测\r\n\r\n不用起服务器、不用装浏览器、不用 mock 时间。一行断言就完事：\r\n\r\n```js\r\nexpect(parseTags(' Vue3, Node ,,')).toEqual(['Vue3', 'Node']);\r\n```\r\n\r\n## 我的抽取策略\r\n\r\n写组件时问自己三个问题：\r\n\r\n1. 这段逻辑**离开页面**还有意义吗？（格式化日期、解析标签、算分页）\r\n2. 它跟 DOM 有关系吗？\r\n3. 我能不能用一句话描述它的输入输出？\r\n\r\n答案依次是\"是 / 否 / 能\"，就抽出去。\r\n\r\n## 覆盖率不是目标\r\n\r\n90% 覆盖率不代表没 bug。它只说明\"代码被执行过\"，不说明\"结果被验证过\"。\r\n\r\n真正有用的指标是：**边界情况有没有测**。\r\n\r\n- 空字符串\r\n- 只有逗号\r\n- 超长文本\r\n- `null` / `undefined`\r\n\r\n所以我给每个工具函数都补了这四类用例。覆盖率是顺带的结果。",
+      "cover": null,
+      "tags": "测试,Vitest,工程化",
+      "status": "published",
+      "views": 74,
+      "created_at": "2026-10-12T19:15:00.000Z",
+      "updated_at": "2026-10-12T19:15:00.000Z"
+    },
+    {
+      "id": 6,
+      "title": "（草稿）给博客加个 RSS 输出",
+      "slug": "draft-rss-feed",
+      "summary": "还没写完：用 /feed.xml 输出最近 20 篇文章，顺便研究一下 XML 转义。",
+      "content": "思路：\r\n\r\n1. 新增 `GET /feed.xml`\r\n2. 查最近 20 篇已发布文章\r\n3. 拼 RSS 2.0 的 XML\r\n\r\n要小心的点：标题里的 `&`、`<` 必须转义，否则 XML 直接解析失败。\r\n\r\n---\r\n\r\n这篇故意留成草稿，用来验证两件事：\r\n\r\n- 前台列表看不到它\r\n- 后台列表能看到，并且可以一键发布",
+      "cover": null,
+      "tags": "Node,待办",
+      "status": "draft",
+      "views": 0,
+      "created_at": "2026-10-30T21:00:00.000Z",
+      "updated_at": "2026-10-30T21:00:00.000Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": 1,
+      "title": "作品集 + 博客 CMS",
+      "role": "全栈 / 独立开发",
+      "description": "你正在看的这个站。前台展示作品与文章，后台支持文章的增删改查、草稿态、标签、搜索与分页，登录使用自实现的 HMAC 令牌鉴权。",
+      "tech": "Vue 3,Vite,Express,SQLite,Pinia",
+      "highlight": "13 个接口 · 手写 JWT · 前后端分离",
+      "link": "",
+      "repo": "https://github.com/Morris8088",
+      "sort_order": 1
+    }
+  ]
+}

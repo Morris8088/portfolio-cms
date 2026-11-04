@@ -11,6 +11,9 @@
 数据存 SQLite 单文件库，鉴权用 Node 内置 `crypto` 手写的 HMAC 令牌——没有 jsonwebtoken、
 没有 bcrypt，目的就是把「鉴权到底在干什么」摊开看。
 
+**在线阅读 Demo → <https://morris8088.github.io/portfolio-cms/>**
+（纯前端静态版，接口由前端模拟，详见 [在线 Demo](#在线-demo)）
+
 ![首页](docs/screenshots/home.png)
 
 ## 目录
@@ -22,6 +25,7 @@
 - [接口一览](#接口一览)
 - [测试](#测试)
 - [几个设计决策](#几个设计决策)
+- [在线 Demo](#在线-demo)
 - [部署](#部署)
 - [已知限制 & 下一步](#已知限制--下一步)
 
@@ -93,7 +97,9 @@ npm run dev          # http://localhost:5173
 **默认账号**：`admin` / `admin123`
 （想改就设环境变量 `ADMIN_USER` / `ADMIN_PASS` 后删库重启，或改 `backend/src/seed.js`。）
 
-> 生产环境务必设置 `JWT_SECRET`，否则用的是代码里的开发默认值。
+> 开发环境用默认密码无所谓。但 `NODE_ENV=production` 时，如果没设 `ADMIN_PASS`、
+> 或者 `JWT_SECRET` 还是代码里的开发值，**服务会拒绝启动**——见
+> [生产环境启动自检](#几个环境变量)。
 
 ## 目录结构
 
@@ -121,8 +127,12 @@ portfolio-cms/
 │   ├── test/pure.test.js     11 条纯函数单测
 │   └── api.http              REST Client 请求样例
 └── frontend/
+    ├── scripts/
+    │   └── build-demo-data.mjs  把 content/ 打包成 demo/data.json（仅 Demo 构建用）
+    ├── .env.demo              Demo 构建专用开关（VITE_DEMO=true）
     ├── src/
     │   ├── api/index.js      所有请求的唯一出口
+    │   ├── demo/             Demo 模式：mockAdapter（拦截请求）+ data.json
     │   ├── stores/auth.js    登录态
     │   ├── router/index.js   路由表 + 守卫
     │   ├── components/       SiteHeader / SiteFooter / PostCard / ProjectCard
@@ -191,6 +201,41 @@ cd frontend && npm test    # 44 passed —— 纯函数：空值、边界、emoj
 文章内容最终走 `v-html`。如果内容里有 `<img onerror=...>`，浏览器会真执行。
 消毒后只保留安全的排版标签。
 
+## 在线 Demo
+
+**<https://morris8088.github.io/portfolio-cms/>**
+
+这是一个**前端静态版**，托管在 GitHub Pages 上。说清楚它是什么，比包装它更重要：
+
+| 能力 | Demo 里怎么表现 |
+|---|---|
+| 浏览文章、搜索、标签筛选、排序、分页 | 真实在前端跑，逻辑与线上同一套代码 |
+| 文章详情、Markdown 渲染、上一篇/下一篇 | 真实 |
+| 后台登录（任意账号密码都能进） | 前端模拟，方便直接点进去看后台 |
+| 新建 / 编辑 / 删除文章 | 真的会改数据，但存在**你自己浏览器的 localStorage** |
+| 图片上传 | 生成本地 blob 链接，刷新后失效 |
+| 数据来源 | 构建时把 `backend/content/*.md` 打包成一份 JSON |
+
+换句话说：**业务逻辑、路由、状态管理、Markdown 渲染、后台交互都是真的；
+被替换掉的只有「HTTP 请求」这一层。**
+
+实现方式是在 axios 的 `adapter` 上做替换。选这个位置是因为
+`api/index.js` 是全站唯一的请求出口，换掉 adapter 之后，**页面代码一行都不用改**——
+没有 `if (isDemo)` 散落在 20 个组件里。这块代码用动态 `import` 加载，
+正式构建产物里完全不存在（可以自己 `npm run build` 后搜一下 `portfolio_demo_posts`，搜不到）。
+
+```bash
+cd frontend
+npm run build:demo     # 生成 data.json + 带 mock 的构建
+npm run preview:demo   # 本地预览 Demo 版
+```
+
+部署由 `.github/workflows/pages.yml` 完成：改动 `frontend/**` 或 `backend/content/**`
+推上去就自动「跑单测 → 构建 → 发布」。
+
+> 想要真正跑 Node + SQLite 的完整版本，需要一台能跑长驻进程的机器，
+> 见下一节。[免费托管的实际情况](#关于免费托管踩过的坑)也写在下面了。
+
 ## 部署
 
 项目支持**单服务模式**：构建前端后，Express 会顺手托管 `frontend/dist`，
@@ -243,7 +288,8 @@ docker run -p 3001:3001 -v $(pwd)/data:/app/data \
 | Render | 能 | 磁盘要付费（Starter 起） | 15 分钟无访问休眠，首次打开要等 30~60 秒 |
 | Railway | 只有一次性试用额度 | — | 试用完就转付费，不算永久免费 |
 | Fly.io | 新账号已无免费额度 | — | 要绑卡 |
-| Koyeb | 免费 nano 实例不休眠 | 卷还在测试阶段 | 存储不保证，适合无状态服务 |
+| Koyeb | 免费 nano 实例不休眠 | 卷还在测试阶段 | 注册要绑卡，且有 $29 预授权冻结 |
+| Vercel / Netlify | 只跑 Serverless 函数 | 无 | 不支持长驻 Node 进程 + 本地 SQLite 文件 |
 
 所以这里做了一个取舍：**按作品集的实际用途来配置**。
 
@@ -257,6 +303,11 @@ docker run -p 3001:3001 -v $(pwd)/data:/app/data \
 
 仓库里已经放了 `Dockerfile`、`render.yaml`、`.dockerignore`，接平台时基本是填空。
 
+**如果只是为了「让人能点开看」，那 GitHub Pages 的静态 Demo 是零成本的最优解**：
+不用注册新平台、不用绑卡、没有冷启动、点开就是秒开。
+代价是读写只在浏览器里生效——这对作品集这个用途来说完全够用。
+真要一个能持久写入的线上实例，再有信用卡之后按上面那节接 Render 即可。
+
 ## 已知限制 & 下一步
 
 - 评论、RSS、文章归档页未做
@@ -265,6 +316,7 @@ docker run -p 3001:3001 -v $(pwd)/data:/app/data \
 - Element Plus 整包引入，体积 940KB（gzip 303KB）。下一步换按需引入可以压到 1/4
 - 没有刷新令牌，令牌过期就得重新登录
 - SQLite 单机够用，多实例部署要换 Postgres
+- 在线 Demo 是前端模拟，写入只落在浏览器本地，不能当真实后端用
 
 ## License
 

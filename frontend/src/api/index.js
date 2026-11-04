@@ -51,6 +51,19 @@ const request = axios.create({
   timeout: 10000
 });
 
+// ---------- Demo 模式（GitHub Pages 静态演示用）----------
+// 只有 `npm run build:demo` 会带上 VITE_DEMO=true。
+// 正式构建 / 本地开发时这个分支根本不存在，mock 代码也不会进入产物。
+// 用动态 import 而不是顶部 import，是为了让打包结果里彻底没有这段代码。
+export const IS_DEMO = import.meta.env.VITE_DEMO === 'true';
+
+if (IS_DEMO) {
+  // 不能 await 在模块顶层（会变成异步模块），
+  // 所以这里用 then 挂上去：adapter 是请求发出时才读取的，
+  // 第一次点击前它一定已经装好了。
+  import('../demo').then((m) => m.installDemoMode(request));
+}
+
 // 请求拦截器：每次请求自动带上令牌。
 // 这里直接读 localStorage 而不是 import store，
 // 因为 store 里也会 import 这个文件 → 循环依赖。
@@ -79,7 +92,9 @@ request.interceptors.response.use(
     if (error.code === 'ECONNABORTED') {
       return Promise.reject(new Error('请求超时，后端可能没启动'));
     }
-    return Promise.reject(new Error('连不上后端，请确认 3001 端口已启动'));
+    return Promise.reject(
+      new Error(IS_DEMO ? '演示数据读取失败，请刷新页面重试' : '连不上后端，请确认 3001 端口已启动')
+    );
   }
 );
 

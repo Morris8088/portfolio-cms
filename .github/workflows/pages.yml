@@ -1,0 +1,73 @@
+name: Deploy Demo to Pages
+
+# 把 frontend 的 Demo 构建发布到 GitHub Pages。
+# 触发方式有两种：
+#   1. push 到 main 且改动了前端 / 内容，自动重新部署
+#   2. 在 Actions 页面手动点 "Run workflow"
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'backend/content/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Pages 部署需要的固定权限，少一个都会失败
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一时间只允许一个部署在跑；
+# 但不要 cancel-in-progress —— 部署中途被打断容易留下半成品
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建 Demo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # 先跑一遍单测：Demo 上线前保证逻辑没坏
+      - name: 安装依赖
+        working-directory: frontend
+        run: npm ci
+
+      - name: 单元测试
+        working-directory: frontend
+        run: npm test
+
+      # build:demo = 生成 data.json + vite build --mode demo
+      # .env.demo 里 VITE_DEMO=true，产物会用 mock 接口 + hash 路由
+      #
+      # 必须在仓库根目录执行：build-demo-data.mjs 要读 ../backend/content，
+      # 如果 working-directory 设成 frontend，相对路径会算错一层。
+      - name: 构建 Demo
+        run: npm --prefix frontend run build:demo
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    name: 发布
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

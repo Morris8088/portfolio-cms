@@ -1,6 +1,6 @@
 // router/index.js —— 前端路由表 + 登录守卫
-import { createRouter, createWebHistory } from 'vue-router';
-import { getToken } from '../api';
+import { createRouter, createWebHistory, createWebHashHistory } from 'vue-router';
+import { getToken, IS_DEMO } from '../api';
 
 import Home from '../views/Home.vue';
 import Projects from '../views/Projects.vue';
@@ -50,7 +50,11 @@ const routes = [
 ];
 
 const router = createRouter({
-  history: createWebHistory(),
+  // Demo 构建跑在 GitHub Pages 上，是纯静态托管：
+  // 访问 /portfolio-cms/posts/3 时服务器会去找一个叫 posts/3 的文件，找不到就 404。
+  // 静态托管没法像 Express 那样"所有路由都返回 index.html"，
+  // 所以 Demo 用 hash 模式（地址里带 #），# 后面的部分浏览器不会发给服务器。
+  history: IS_DEMO ? createWebHashHistory() : createWebHistory(),
   routes,
   scrollBehavior(to, from, savedPosition) {
     // 浏览器前进/后退时回到原来的滚动位置
