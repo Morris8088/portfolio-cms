@@ -6,13 +6,16 @@
  *   refusing to allow a Personal Access Token to create or update workflow
  *   '.github/workflows/ci.yml' without 'workflow' scope
  *
- * 所以 CI 配置先以 tools/ci.yml 的形式躺在仓库里。等 token 补上 workflow 权限后，
+ * 所以 CI 配置先以 tools/ci.yml 的形式放在仓库里。等 token 补上 workflow 权限后，
  * 在仓库根目录执行：
  *   node tools/enable-ci.mjs <你的token>
  * 它会把这个文件搬到 .github/workflows/ci.yml 并推送，Actions 立刻开始跑。
+ * 跑完记得把 README 第 3-4 行的注释去掉、删掉第 5 行的静态 tests 徽章。
  *
- * 也可以直接在网页上传：把 tools/ci.yml 下载下来，在 GitHub 网页上新建文件
- * .github/workflows/ci.yml 粘贴内容，网页提交不受这个限制。
+ * 更省事的替代方案（不需要新 token）：打开
+ *   https://github.com/Morris8088/portfolio-cms/blob/main/tools/ci.yml
+ * 复制内容，在网页上新建文件 .github/workflows/ci.yml 粘贴提交。
+ * 网页操作走的是你的登录会话，不受 PAT 权限限制。
  */
 import { readFileSync } from 'node:fs';
 
@@ -23,7 +26,7 @@ if (!token) {
 }
 
 const API = 'https://api.github.com/repos/Morris8088/portfolio-cms';
-const headers = {
+const baseHeaders = {
   Authorization: `token ${token}`,
   Accept: 'application/vnd.github+json',
   'Content-Type': 'application/json',
@@ -31,7 +34,10 @@ const headers = {
 };
 
 async function api(path, init = {}) {
-  const res = await fetch(`${API}${path}`, { ...init, headers: { ...headers, ...(init.headers || {}) } });
+  const res = await fetch(`${API}${path}`, {
+    ...init,
+    headers: { ...baseHeaders, ...(init.headers || {}) },
+  });
   const text = await res.text();
   const data = text ? JSON.parse(text) : {};
   if (!res.ok) {
@@ -83,4 +89,4 @@ await api('/git/refs/heads/main', {
 console.log('✅ 已启用 CI');
 console.log(`提交：https://github.com/Morris8088/portfolio-cms/commit/${commit.sha}`);
 console.log('运行记录：https://github.com/Morris8088/portfolio-cms/actions');
-console.log('下一步：把 README 第 3-4 行的注释去掉，启用绿色徽章，并删掉第 5 行的静态 tests 徽章。');
+console.log('下一步：README 第 3-4 行取消注释启用徽章，并删掉第 5 行的静态 tests 徽章。');
