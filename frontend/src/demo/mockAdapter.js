@@ -281,27 +281,46 @@ const routes = [
   }
 ];
 
+// 统一 URL 形状：一律以单个 "/" 开头。
+// axios 传进来的本来就是 "/posts"，所以这是幂等的；
+// 万一某天调用方传了 "posts" 或 "//posts"，也在这里归一，
+// 而不是在下面每个正则里写两套。约定只有一处，才不容易出岔子。
+function normalizePath(url) {
+  const path = String(url || '').split('?')[0].trim();
+  return `/${path.replace(/^\/+/, '')}`;
+}
+
+function findRoute(method, url) {
+  const path = normalizePath(url);
+  const route = routes.find((r) => r.method === method && r.test.test(path));
+  return route ? { route, path } : null;
+}
+
 /**
  * 这是注册给 axios 的 adapter。
  * axios 期望返回 { data, status, statusText, headers, config, request }。
  * 业务代码里写的是 .then(res => res.data)，所以这里返回的 data 就是接口响应体。
  */
 export default function demoAdapter(config) {
-  // 去掉起始斜杠和查询串，只留路径部分
-  const url = String(config.url || '').replace(/^\/+/, '').split('?')[0];
+  // 注意这里把原始 url 直接交给 findRoute，由它统一规范成 "/xxx"。
+  // 之前这里多写了一个 replace(/^\/+/, '') 把斜杠删了，
+  // 而路由正则要求带斜杠，结果全线失配——线上每个页面都在报
+  // "演示数据读取失败"。回归测试见 test/demoAdapter.test.js。
+  const url = config.url;
   const method = String(config.method || 'get').toLowerCase();
 
   // 小延迟，模拟真实网络，让 loading 状态能看一眼
   return new Promise((resolve, reject) => {
     setTimeout(() => {
-      const route = routes.find((r) => r.method === method && r.test.test(url));
-      if (!route) {
-        reject(new Error(`Demo 模式未实现该接口：${method.toUpperCase()} /${url}`));
+      const found = findRoute(method, url);
+      if (!found) {
+        reject(new Error(`Demo 模式未实现该接口：${method.toUpperCase()} ${url}`));
         return;
       }
+      const { route, path } = found;
 
       const ctx = {
-        match: url.match(route.test),
+        match: path.match(route.test),
         params: config.params || {},
         body: typeof config.data === 'string' ? safeParse(config.data) : config.data,
         formData: config.data instanceof FormData ? config.data : null
