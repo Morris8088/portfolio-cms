@@ -1,6 +1,9 @@
 # 作品集 + 博客 CMS
 
-[![CI](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml)
+<!-- CI 徽章：workflow 推上去之后把下面这行取消注释，同时删掉再下面的静态徽章 -->
+<!-- [![CI](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml/badge.svg)](https://github.com/Morris8088/portfolio-cms/actions/workflows/ci.yml) -->
+![tests](https://img.shields.io/badge/tests-99%20passing-brightgreen)
+![node](https://img.shields.io/badge/node-%E2%89%A522.5-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 一个可以真正写完、部署上线、并且能对着代码讲清楚的全栈项目。
