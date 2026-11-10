@@ -3,7 +3,7 @@
     <div class="container narrow">
       <!-- 顶部返回 -->
       <div class="bar">
-        <router-link to="/" class="back">← 返回文章列表</router-link>
+        <router-link :to="{ path: '/', hash: '#posts' }" class="back">← 返回文章列表</router-link>
         <router-link v-if="auth.isLoggedIn && post" :to="`/admin/posts/${post.id}/edit`" class="edit">
           编辑这篇
         </router-link>

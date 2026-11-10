@@ -15,7 +15,12 @@
 
         <div class="hero-actions">
           <router-link to="/projects" class="btn primary">看看作品</router-link>
-          <a href="#posts" class="btn">读读文章</a>
+          <!-- 这里不能写「href 指向 #posts 的普通 a 标签」。
+               Demo 用的是 hash 路由，地址栏里 # 后面整段都会被 Vue Router
+               当成"路由路径"：#posts 会被规范化成 #/posts，
+               而路由表里只有 /posts/:id，没有 /posts —— 于是直接进 404 页。
+               想滚到本页的文章区，就只动滚动条、别去碰地址栏。 -->
+          <button type="button" class="btn" @click="scrollToPosts">读读文章</button>
         </div>
 
         <p class="stack">
@@ -178,6 +183,13 @@ const lastUpdated = computed(() => {
   return formatDateShort(posts.value[0].created_at);
 });
 
+// ---------- 页面内滚动 ----------
+// 只滚到 #posts 区块，不改变 location.hash。
+// 原因见模板里「读读文章」按钮上方的注释：hash 路由下改 hash = 换路由。
+function scrollToPosts() {
+  document.getElementById('posts')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // ---------- 加载列表 ----------
 async function loadPosts() {
   loading.value = true;
@@ -318,7 +330,9 @@ onMounted(async () => {
   border-radius: 9px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
+  font-family: inherit;
   font-size: 14px;
+  line-height: 1.5;
   color: var(--ink);
   cursor: pointer;
   transition: all 0.2s ease;

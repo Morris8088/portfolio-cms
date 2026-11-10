@@ -110,6 +110,8 @@ try {
   check('文章卡片已渲染', cards > 0, `实际 ${cards} 张`);
   check('没有「请求失败」提示', !text.includes('请求失败'));
   check('显示文章总数', /共 \d+ 篇/.test(text), (text.match(/共 \d+ 篇/) || ['无'])[0]);
+  const token = await evaluate("localStorage.getItem('portfolio_token') || ''");
+  check('未登录的读者也能看到文章', cards > 0 && !token, `卡片 ${cards} 张, token=${token || '无'}`);
 
   console.log('\n② 点第一张卡片进详情页');
   await evaluate("document.querySelector('a.post-card').click()");
@@ -136,6 +138,29 @@ try {
   const h1c = await evaluate("document.querySelector('h1')?.innerText || ''");
   check('自动纠正到 hash 形式', hrefC.includes('#/posts/3'), hrefC);
   check('纠正后文章正常显示', h1c.length > 0, h1c);
+
+  console.log('\n⑤ 点首页「读读文章」按钮（读者最常用的入口）');
+  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}${PREFIX}/#/` });
+  await sleep(3500);
+  await evaluate(
+    "[...document.querySelectorAll('.hero-actions .btn')].find(e => e.innerText.includes('读读文章'))?.click()"
+  );
+  await sleep(1500);
+  const hrefD = await evaluate('location.href');
+  const textD = String(await evaluate("document.querySelector('#app').innerText")).slice(0, 160);
+  const scrollY = await evaluate('window.scrollY');
+  check('点按钮不会跳进 #/posts 这个不存在的路由', !/#\/posts\b/.test(hrefD), hrefD);
+  check('点按钮后没有掉进 404 页', !textD.includes('这个地址没有内容'), textD.replace(/\n/g, ' | '));
+  check('页面滚动到了文章区', scrollY > 100, `scrollY=${scrollY}`);
+
+  console.log('\n⑥ 直接访问 /posts（旧链接、别人分享的地址）');
+  await send('Page.navigate', { url: `http://127.0.0.1:${PORT}${PREFIX}/#/posts` });
+  await sleep(3500);
+  const hrefE = await evaluate('location.href');
+  const cardsE = await evaluate("document.querySelectorAll('a.post-card').length");
+  const textE = String(await evaluate("document.querySelector('#app').innerText")).slice(0, 160);
+  check('没有停在 404 页', !textE.includes('这个地址没有内容'), textE.replace(/\n/g, ' | '));
+  check('仍然能看到文章列表', cardsE > 0, `卡片 ${cardsE} 张 · ${hrefE}`);
 
   console.log(failed === 0 ? '\n全部通过 ✅' : `\n有 ${failed} 项失败 ❌`);
 } catch (e) {

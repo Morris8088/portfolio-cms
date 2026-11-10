@@ -17,6 +17,10 @@ const PostEditor = () => import('../views/admin/PostEditor.vue');
 const routes = [
   { path: '/', name: 'home', component: Home, meta: { title: '首页' } },
   { path: '/projects', name: 'projects', component: Projects, meta: { title: '作品' } },
+  // 兜底：hash 路由下 #posts 会被规范化成 /posts；旧链接、外部分享的地址
+  // 也可能带这一段。路由表里只有 /posts/:id（具体某篇文章），没有 /posts，
+  // 所以这里统一送回首页的文章区，别让访客落进 404 页。
+  { path: '/posts', redirect: { name: 'home', hash: '#posts' } },
   { path: '/posts/:id', name: 'post-detail', component: PostDetail },
   { path: '/about', name: 'about', component: About, meta: { title: '关于' } },
 

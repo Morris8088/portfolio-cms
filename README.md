@@ -172,7 +172,7 @@ portfolio-cms/
 
 ```bash
 cd backend  && npm test    # 55 passed —— 44 条接口（鉴权/CRUD/校验/分页/搜索/注入/上传）+ 11 条纯函数
-cd frontend && npm test    # 62 passed —— 纯函数 + Demo 假后端路由 + Demo 启动顺序
+cd frontend && npm test    # 68 passed —— 纯函数 + Demo 假后端路由 + Demo 启动顺序 + 站内跳转守卫
 ```
 
 后端测试用 `:memory:` 内存库，跑完即弃，不污染 `data.db`。
@@ -183,11 +183,21 @@ cd frontend && npm test    # 62 passed —— 纯函数 + Demo 假后端路由 +
 ```bash
 cd frontend
 npm run build:demo   # 先构建
-npm run e2e:demo     # 起本地静态服务器 + 用系统 Chrome 走一遍：首页有文章 → 点进详情 → 深链 → 不带 # 的兜底
+npm run e2e:demo     # 本地静态服务器 + 系统 Chrome，走 6 组场景
 ```
 
-它会真的点一次文章卡片，断言正文比 200 字长；踩过的两个坑（假后端路由全挂、假后端装晚了）
-都会在这里直接红掉。需要本机装有 Chrome，路径不对就用 `CHROME_PATH` 环境变量指定。
+场景：首页有文章（含未登录的读者视角）→ 点卡片进详情 → 深链直达 →
+不带 `#` 的兜底 → 点「读读文章」按钮 → 直接访问 `#/posts` 的兜底。
+它会真的点一次文章卡片，断言正文比 200 字长。
+
+踩过的三个坑，都会在这里直接红掉：
+1. 假后端的路由全挂（URL 前导斜杠被删，正则匹配不上）；
+2. 假后端装得太晚（首页第一批请求在 adapter 装好之前就发出去了）；
+3. 首页「读读文章」写成 `<a href="#posts">`：hash 路由下 `#` 后面整段都是路由路径，
+   `#posts` 被当成 `/posts`，而路由表只有 `/posts/:id` —— 访客直接掉进 404 页。
+   **页面内锚点在 hash 路由下必须用 JS 滚动**（`scrollIntoView`），不能改 `location.hash`。
+
+需要本机装有 Chrome，路径不对就用 `CHROME_PATH` 环境变量指定。
 
 **CI**：每次推送和 PR 都会在 GitHub Actions 上并行跑「后端接口测试」和「前端单测 + 生产构建」
 （`.github/workflows/ci.yml`），Node 22 + `npm ci`，任何一步红了分支就不算绿的。
@@ -228,6 +238,10 @@ npm run e2e:demo     # 起本地静态服务器 + 用系统 Chrome 走一遍：�
 | 新建 / 编辑 / 删除文章 | 真的会改数据，但存在**你自己浏览器的 localStorage** |
 | 图片上传 | 生成本地 blob 链接，刷新后失效 |
 | 数据来源 | 构建时把 `backend/content/*.md` 打包成一份 JSON |
+| 读者需要登录吗 | **不需要**。5 篇预置文章在前台公开可见，后台那张列表只是给作者用的管理视图 |
+
+Demo 用 hash 路由，地址形如 `.../#/posts/1`；访问不带 `#` 的深链时，
+`public/404.html` 会自动把它纠正成 hash 形式。首页「读读文章」按钮只滚动页面，不改地址栏。
 
 换句话说：**业务逻辑、路由、状态管理、Markdown 渲染、后台交互都是真的；
 被替换掉的只有「HTTP 请求」这一层。**
