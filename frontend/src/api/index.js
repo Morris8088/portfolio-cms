@@ -57,12 +57,16 @@ const request = axios.create({
 // 用动态 import 而不是顶部 import，是为了让打包结果里彻底没有这段代码。
 export const IS_DEMO = import.meta.env.VITE_DEMO === 'true';
 
-if (IS_DEMO) {
-  // 不能 await 在模块顶层（会变成异步模块），
-  // 所以这里用 then 挂上去：adapter 是请求发出时才读取的，
-  // 第一次点击前它一定已经装好了。
-  import('../demo').then((m) => m.installDemoMode(request));
-}
+// 这里导出一个 Promise，由 main.js 在挂载应用之前 await。
+//
+// 之前这里是 import('../demo').then(...)，装完就完了，没人等它。
+// 结果是：应用先 mount，页面 onMounted 里第一批请求（文章列表 / 标签 / 作品）
+// 在 adapter 装上之前就发出去了，直接打到真实的 /api/posts。
+// GitHub Pages 上没有这个文件，返回 404 —— 表现就是首页「共 0 篇 + 请求失败（404）」。
+// 而晚一点发出的请求（作品、标签）反而正常，因为那时假后端已经装好了。
+export const demoReady = IS_DEMO
+  ? import('../demo').then((m) => m.installDemoMode(request))
+  : Promise.resolve();
 
 // 请求拦截器：每次请求自动带上令牌。
 // 这里直接读 localStorage 而不是 import store，

@@ -115,7 +115,11 @@
         type="error"
         show-icon
         :closable="false"
-        description="确认后端是否在 3001 端口运行：cd backend && npm run dev"
+        :description="
+          IS_DEMO
+            ? '这是纯静态演示站，数据由浏览器本地模拟，刷新一次页面即可'
+            : '确认后端是否在 3001 端口运行：cd backend && npm run dev'
+        "
       />
 
       <div v-else-if="posts.length === 0" class="empty">
@@ -148,7 +152,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import PostCard from '../components/PostCard.vue';
 import ProjectCard from '../components/ProjectCard.vue';
-import { getPosts, getTags, getProjects } from '../api';
+import { getPosts, getTags, getProjects, IS_DEMO } from '../api';
 import { formatDateShort } from '../utils/date';
 
 // ---------- 状态 ----------

@@ -60,32 +60,24 @@
       // ============================================================
       // GitHub Pages 的 SPA 兜底页
       // ------------------------------------------------------------
-      // Pages 是纯静态托管：访问 /portfolio-cms/projects 时会去找一个
-      // 叫 "projects" 的文件，找不到就返回 404.html（也就是本文件）。
+      // Pages 是纯静态托管：访问 /portfolio-cms/posts/3 时会去找一个
+      // 叫 "posts/3" 的文件，找不到就返回 404.html（也就是本文件）。
       //
-      // 这里把用户想要的路径搬到 # 后面，再跳回正常入口。
-      // 例：/portfolio-cms/projects?x=1
-      //   → /portfolio-cms/#/projects?x=1
+      // 这里把用户想要的路径搬到 # 后面，再跳回正常入口：
+      //   /portfolio-cms/posts/3  →  /portfolio-cms/#/posts/3
       //
-      // 路径前缀从 Pages 的仓库名推导，不写死，换仓库名也不用改。
+      // 前缀直接写仓库名，不做启发式猜测 —— 之前按 hostname 推断，
+      // 换个域名（本地验收、自定义域名）就推错了。改仓库名只改 REPO_BASE。
       // ============================================================
       (function () {
+        var REPO_BASE = '/portfolio-cms/';
+
         var path = decodeURIComponent(location.pathname);
         var search = location.search || '';
 
-        // GitHub Pages 项目站点的路径形如 /<repo>/<route...>，
-        // 取第一段作为 base。用户站（<user>.github.io）则直接是 /<route...>。
-        var segments = path.split('/').filter(Boolean);
-        var base;
-        if (location.hostname.endsWith('github.io')) {
-          base = segments.length && location.hostname !== 'github.io'
-            ? '/' + segments[0] + '/'
-            : '/';
-        } else {
-          base = '/';
-        }
-
-        var rest = path.slice(base.length - 1).replace(/^\/+/, '');
+        // 切掉站点前缀，剩下的就是前端路由要的那一段
+        var base = path.indexOf(REPO_BASE) === 0 ? REPO_BASE : '/';
+        var rest = path.slice(base.length).replace(/^\/+/, '');
 
         var target = base + '#' + (rest ? '/' + rest : '/') + search;
 

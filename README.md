@@ -172,10 +172,22 @@ portfolio-cms/
 
 ```bash
 cd backend  && npm test    # 55 passed —— 44 条接口（鉴权/CRUD/校验/分页/搜索/注入/上传）+ 11 条纯函数
-cd frontend && npm test    # 44 passed —— 纯函数：空值、边界、emoji、时区
+cd frontend && npm test    # 62 passed —— 纯函数 + Demo 假后端路由 + Demo 启动顺序
 ```
 
 后端测试用 `:memory:` 内存库，跑完即弃，不污染 `data.db`。
+
+前端还有一层**端到端验收**，专门盯 Demo 版本在真浏览器里的表现
+（单元测试证明不了「请求发得够晚」这种事）：
+
+```bash
+cd frontend
+npm run build:demo   # 先构建
+npm run e2e:demo     # 起本地静态服务器 + 用系统 Chrome 走一遍：首页有文章 → 点进详情 → 深链 → 不带 # 的兜底
+```
+
+它会真的点一次文章卡片，断言正文比 200 字长；踩过的两个坑（假后端路由全挂、假后端装晚了）
+都会在这里直接红掉。需要本机装有 Chrome，路径不对就用 `CHROME_PATH` 环境变量指定。
 
 **CI**：每次推送和 PR 都会在 GitHub Actions 上并行跑「后端接口测试」和「前端单测 + 生产构建」
 （`.github/workflows/ci.yml`），Node 22 + `npm ci`，任何一步红了分支就不算绿的。
